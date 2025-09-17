@@ -1,5 +1,5 @@
 ## Hi there 👋
-[![TryHackMe Badge](https://tryhackme-badges.s3.amazonaws.com/chamresh.png)](https://tryhackme.com/p/chamresh)
+[![TryHackMe Badge](https://tryhackme.com/api/v2/badges/public-profile?userPublicId=3557988)](https://tryhackme.com/p/chamresh)
 <!--
 **chamresh/chamresh** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
 
