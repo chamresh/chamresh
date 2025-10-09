@@ -1,4 +1,13 @@
 ## Hi there 👋
+
+
+
+<!-- THM-START -->
+<!-- The TryHackMe live badge and info will be auto-updated here by GitHub Actions. Do NOT edit between these markers. -->
+<!-- THM-END -->
+
+<!-- Optional: other content below -->
+
 [![TryHackMe Badge](https://tryhackme-badges.s3.amazonaws.com/chamresh.png)](https://tryhackme.com/p/chamresh)
 
 <!--
