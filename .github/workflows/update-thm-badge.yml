@@ -2,38 +2,100 @@ name: Update TryHackMe Badge (every 6 hours)
 
 on:
   schedule:
-    - cron: '0 */6 * * *'   # every 6 hours
-  workflow_dispatch:       # allow manual runs
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 jobs:
-  update-thm:
+  render-and-update:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Download TryHackMe badge image
-        run: |
-          # public badge endpoint you gave
-          THM_BADGE_URL="https://tryhackme.com/api/v2/badges/public-profile?userPublicId=3557988"
-          curl -sL "$THM_BADGE_URL" -o thm-badge.png
-          ls -l thm-badge.png
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-      - name: Create update script (update_readme.py)
+      - name: Install renderer deps
+        run: |
+          npm init -y
+          npm i puppeteer@21.3.1 --silent
+
+      - name: Create renderer script
+        run: |
+          cat > render_badge.js <<'NODE'
+          const fs = require('fs');
+          const puppeteer = require('puppeteer');
+
+          (async () => {
+            const badgeUrl = 'https://tryhackme.com/api/v2/badges/public-profile?userPublicId=3557988';
+            const out = 'thm-badge.png';
+
+            // Launch headless chrome
+            const browser = await puppeteer.launch({
+              args: ['--no-sandbox', '--disable-setuid-sandbox']
+            });
+            const page = await browser.newPage();
+
+            // Improve rendering: set viewport similar to widget size
+            await page.setViewport({ width: 340, height: 120, deviceScaleFactor: 2 });
+
+            // Load the badge HTML directly
+            await page.goto(badgeUrl, {waitUntil: 'networkidle2', timeout: 30000});
+
+            // Wait a bit for fonts / images
+            await page.waitForTimeout(800);
+
+            // Some badge fragments rely on inline styles; ensure body background is transparent
+            await page.evaluate(() => {
+              document.body.style.background = 'transparent';
+            });
+
+            // Determine bounding box of the badge element (widget)
+            const el = await page.$('#thm-badge') || (await page.$('body'));
+            const rect = await el.boundingBox();
+
+            // If boundingBox not available, take full page screenshot
+            if (!rect) {
+              await page.screenshot({ path: out, omitBackground: true });
+            } else {
+              // screenshot the element area (with small padding)
+              const padding = 4;
+              await page.screenshot({
+                path: out,
+                clip: {
+                  x: Math.max(rect.x - padding, 0),
+                  y: Math.max(rect.y - padding, 0),
+                  width: Math.min(rect.width + padding*2, page.viewport().width),
+                  height: Math.min(rect.height + padding*2, page.viewport().height)
+                },
+                omitBackground: true
+              });
+            }
+
+            console.log('Saved:', out);
+            await browser.close();
+          })().catch(e => { console.error(e); process.exit(1); });
+          NODE
+
+      - name: Render the TryHackMe badge to PNG
+        run: |
+          node render_badge.js
+          ls -l thm-badge.png || true
+
+      - name: Create update_readme.py
         run: |
           cat > update_readme.py <<'PY'
           import re, sys, pathlib, datetime
-
           README = pathlib.Path("README.md")
           if not README.exists():
               print("README.md not found in repo root.")
               sys.exit(1)
-
           badge_file = "thm-badge.png"
           if not pathlib.Path(badge_file).exists():
               print(f"{badge_file} not found. Exiting.")
               sys.exit(1)
-
           new_md = f"""<!-- THM-START -->
           <!-- The TryHackMe live badge and info will be auto-updated by GitHub Actions. Do NOT edit between these markers. -->
           <div align="center">
@@ -43,43 +105,32 @@ jobs:
           <p>Last updated: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>
           </div>
           <!-- THM-END -->"""
-
           text = README.read_text(encoding="utf-8")
           if re.search(r"<!-- THM-START -->.*?<!-- THM-END -->", text, flags=re.S):
               new_text = re.sub(r"<!-- THM-START -->.*?<!-- THM-END -->", new_md, text, flags=re.S)
           else:
-              # If markers don't exist, append at top
               new_text = new_md + "\n\n" + text
-
           if new_text != text:
               README.write_text(new_text, encoding="utf-8")
               print("README.md updated.")
               sys.exit(0)
-          else:
-              print("No changes to README.md.")
-              sys.exit(2)
+          print("No changes to README.md.")
+          sys.exit(2)
           PY
 
       - name: Run updater to insert badge into README
-        id: updater
         run: |
           python3 update_readme.py || echo "update_readme exit code $?"
 
-      - name: Commit changed files
-        if: always()    # we check exit code below; commit only if README changed or image new
+      - name: Commit and push changes
         run: |
-          # configure git
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Add the badge image and README
           git add thm-badge.png README.md || true
-
-          # If there are changes to commit, commit and push
           if ! git diff --staged --quiet; then
             git commit -m "chore: update TryHackMe badge and timestamp [ci skip]" || true
             git push
-            echo "Pushed changes."
+            echo "Pushed changes"
           else
-            echo "No changes to commit."
+            echo "No changes to commit"
           fi
