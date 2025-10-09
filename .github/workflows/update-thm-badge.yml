@@ -1,0 +1,85 @@
+name: Update TryHackMe Badge (every 6 hours)
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # every 6 hours
+  workflow_dispatch:       # allow manual runs
+
+jobs:
+  update-thm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download TryHackMe badge image
+        run: |
+          # public badge endpoint you gave
+          THM_BADGE_URL="https://tryhackme.com/api/v2/badges/public-profile?userPublicId=3557988"
+          curl -sL "$THM_BADGE_URL" -o thm-badge.png
+          ls -l thm-badge.png
+
+      - name: Create update script (update_readme.py)
+        run: |
+          cat > update_readme.py <<'PY'
+          import re, sys, pathlib, datetime
+
+          README = pathlib.Path("README.md")
+          if not README.exists():
+              print("README.md not found in repo root.")
+              sys.exit(1)
+
+          badge_file = "thm-badge.png"
+          if not pathlib.Path(badge_file).exists():
+              print(f"{badge_file} not found. Exiting.")
+              sys.exit(1)
+
+          new_md = f"""<!-- THM-START -->
+          <!-- The TryHackMe live badge and info will be auto-updated by GitHub Actions. Do NOT edit between these markers. -->
+          <div align="center">
+          <a href="https://tryhackme.com/p/chamresh" target="_blank" rel="noopener noreferrer">
+            <img src="{badge_file}" alt="TryHackMe badge - chamresh" />
+          </a>
+          <p>Last updated: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>
+          </div>
+          <!-- THM-END -->"""
+
+          text = README.read_text(encoding="utf-8")
+          if re.search(r"<!-- THM-START -->.*?<!-- THM-END -->", text, flags=re.S):
+              new_text = re.sub(r"<!-- THM-START -->.*?<!-- THM-END -->", new_md, text, flags=re.S)
+          else:
+              # If markers don't exist, append at top
+              new_text = new_md + "\n\n" + text
+
+          if new_text != text:
+              README.write_text(new_text, encoding="utf-8")
+              print("README.md updated.")
+              sys.exit(0)
+          else:
+              print("No changes to README.md.")
+              sys.exit(2)
+          PY
+
+      - name: Run updater to insert badge into README
+        id: updater
+        run: |
+          python3 update_readme.py || echo "update_readme exit code $?"
+
+      - name: Commit changed files
+        if: always()    # we check exit code below; commit only if README changed or image new
+        run: |
+          # configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Add the badge image and README
+          git add thm-badge.png README.md || true
+
+          # If there are changes to commit, commit and push
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: update TryHackMe badge and timestamp [ci skip]" || true
+            git push
+            echo "Pushed changes."
+          else
+            echo "No changes to commit."
+          fi
