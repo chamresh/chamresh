@@ -3,7 +3,13 @@
 
 
 <!-- THM-START -->
-<!-- The TryHackMe live badge and info will be auto-updated here by GitHub Actions. Do NOT edit between these markers. -->
+<!-- The TryHackMe live badge and info will be auto-updated by GitHub Actions. Do NOT edit between these markers. -->
+<div align="center">
+<a href="https://tryhackme.com/p/chamresh" target="_blank" rel="noopener noreferrer">
+  <img src="thm-badge.png" alt="TryHackMe badge - chamresh" />
+</a>
+<p>Last updated: 2025-10-09 04:57 UTC</p>
+</div>
 <!-- THM-END -->
 
 <!-- Optional: other content below -->
