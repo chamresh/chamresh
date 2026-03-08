@@ -29,60 +29,65 @@ jobs:
           const puppeteer = require('puppeteer');
 
           (async () => {
-            const badgeUrl = 'https://tryhackme.com/api/v2/badges/public-profile?userPublicId=3557988';
-            const out = 'thm-badge.png';
+            try {
+              const badgeUrl = 'https://tryhackme.com/api/v2/badges/public-profile?userPublicId=3557988';
+              const out = 'thm-badge.png';
 
-            // Launch headless chrome
-            const browser = await puppeteer.launch({
-              args: ['--no-sandbox', '--disable-setuid-sandbox']
-            });
-            const page = await browser.newPage();
-
-            // Improve rendering: set viewport similar to widget size
-            await page.setViewport({ width: 340, height: 120, deviceScaleFactor: 2 });
-
-            // Load the badge HTML directly
-            await page.goto(badgeUrl, {waitUntil: 'networkidle2', timeout: 30000});
-
-            // Wait a bit for fonts / images
-            await page.waitForTimeout(800);
-
-            // Some badge fragments rely on inline styles; ensure body background is transparent
-            await page.evaluate(() => {
-              document.body.style.background = 'transparent';
-            });
-
-            // Determine bounding box of the badge element (widget)
-            const el = await page.$('#thm-badge') || (await page.$('body'));
-            const rect = await el.boundingBox();
-
-            // If boundingBox not available, take full page screenshot
-            if (!rect) {
-              await page.screenshot({ path: out, omitBackground: true });
-            } else {
-              // screenshot the element area (with small padding)
-              const padding = 4;
-              await page.screenshot({
-                path: out,
-                clip: {
-                  x: Math.max(rect.x - padding, 0),
-                  y: Math.max(rect.y - padding, 0),
-                  width: Math.min(rect.width + padding*2, page.viewport().width),
-                  height: Math.min(rect.height + padding*2, page.viewport().height)
-                },
-                omitBackground: true
+              // Launch headless chrome
+              const browser = await puppeteer.launch({
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
               });
-            }
+              const page = await browser.newPage();
 
-            console.log('Saved:', out);
-            await browser.close();
-          })().catch(e => { console.error(e); process.exit(1); });
+              // Improve rendering: set viewport similar to widget size
+              await page.setViewport({ width: 340, height: 120, deviceScaleFactor: 2 });
+
+              // Load the badge HTML directly
+              await page.goto(badgeUrl, { waitUntil: 'load', timeout: 30000 });
+
+              // Wait a bit for fonts / images
+              await page.waitForTimeout(800);
+
+              // Some badge fragments rely on inline styles; ensure body background is transparent
+              await page.evaluate(() => {
+                document.body.style.background = 'transparent';
+              });
+
+              // Determine bounding box of the badge element (widget)
+              const el = await page.$('#thm-badge') || (await page.$('body'));
+              const rect = await el.boundingBox();
+
+              // If boundingBox not available, take full page screenshot
+              if (!rect) {
+                await page.screenshot({ path: out, omitBackground: true });
+              } else {
+                // screenshot the element area (with small padding)
+                const padding = 4;
+                await page.screenshot({
+                  path: out,
+                  clip: {
+                    x: Math.max(rect.x - padding, 0),
+                    y: Math.max(rect.y - padding, 0),
+                    width: Math.min(rect.width + padding*2, page.viewport().width),
+                    height: Math.min(rect.height + padding*2, page.viewport().height)
+                  },
+                  omitBackground: true
+                });
+              }
+
+              console.log('Badge saved:', out);
+              await browser.close();
+            } catch (error) {
+              console.error('Error rendering badge:', error);
+              process.exit(1);
+            }
+          })();
           NODE
 
       - name: Render the TryHackMe badge to PNG
         run: |
           node render_badge.js
-          ls -l thm-badge.png || true
+          ls -l thm-badge.png || echo "Badge file not found"
 
       - name: Create update_readme.py
         run: |
@@ -120,7 +125,7 @@ jobs:
 
       - name: Run updater to insert badge into README
         run: |
-          python3 update_readme.py || echo "update_readme exit code $?"
+          python3 update_readme.py || echo "Python script exit code: $?"
 
       - name: Commit and push changes
         run: |
