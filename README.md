@@ -8,7 +8,7 @@
 <a href="https://tryhackme.com/p/chamresh" target="_blank" rel="noopener noreferrer">
   <img src="thm-badge.png" alt="TryHackMe badge - chamresh" />
 </a>
-<p>Last updated: 2026-06-03 20:50 UTC</p>
+<p>Last updated: 2026-06-04 09:46 UTC</p>
 </div>
 <!-- THM-END -->
 
